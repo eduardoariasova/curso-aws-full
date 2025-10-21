@@ -6,7 +6,8 @@ import axios from 'axios';
 
 function Home() {
 
-    const [archivo, setArchivo] = useState(null);
+    const [archivo, setArchivo]   = useState(null);
+    const [urlVideo, setURLVideo] = useState("");
 
 
     function controlArchivo(event){
@@ -36,11 +37,37 @@ function Home() {
             headers: {'Content-Type': 'multipart/form-data',},
             params: {tipoArchivo: tipoArchivo},
         });
-
+        
+        if(response.status === 200){
+            setURLVideo(response.data.urlGlobal); // guardamos la url para mostrarla
+        }
         alert(response.data.mensaje);
     }
 
+    function controlURL(event) {
+        const urlEscrita = event.target.value.trim();
+        setURLVideo(urlEscrita);
 
+        try {
+            new URL(urlEscrita); // Si no es una URL válida, lanza error
+            console.log("✅ Es una URL válida");
+            //alert("✅ Es una URL válida");
+        } catch {
+            console.log("❌ No es una URL válida");
+            alert("❌ No es una URL válida");
+        }
+    }
+
+
+    async function recortarVideo(event){
+        console.log("urlVideo: ", urlVideo);
+
+        const responseRecortar = await axios.post("/recortar-video", {
+            params: {urlVideo}
+        });
+
+        console.log(responseRecortar);
+    }
     
 
     return(
@@ -49,16 +76,36 @@ function Home() {
             <h1>Curso AWS</h1>
             <p>AWS Fullstack: Node.js + React + Servicios en la Nube</p>
             
+            {/* INPUT DE ARCHIVO */}
             <div className="mt-4 mb-4">
-                <input type="file" accept="image/*,video/*" className="form-control w-75 mx-auto" id="formFile" onChange={controlArchivo} />
+                <h2 className='text-start'>Input archivo</h2>
+                <input type="file" accept="image/*,video/*" className="form-control w-100 mx-auto" id="formFile" onChange={controlArchivo} />
             </div>
 
-            <div className="row justify-content-center">
+
+
+            {/* INPUT DE URL */}
+            <h2 className='text-start'>Input URL Video</h2>
+            <p className='text-start'>Escribe una url de un video o se llenará sola cuando subas un video.</p>
+            <div className="input-group mb-3">
+                <span className="input-group-text">URL</span>
+                <div className="form-floating">
+                    <input type="text" className="form-control" id="floatingInputGroup1" placeholder="Username" value={urlVideo} onChange={controlURL} />
+                    <label htmlFor="floatingInputGroup1">URL de video</label>
+                </div>
+            </div>
+
+
+
+            {/* ACCIONES */}
+            <div className="row justify-content-center mt-5">
+                {/* botón subida de archivo */}
                 <div className="col-auto">
                     <button onClick={subidaS3} className="btn btn-primary">Subir archivo a s3</button>
                 </div>
+                {/* botón recortar video con media convert */}
                 <div className="col-auto">
-                    <button className="btn btn-success">Acción 2</button>
+                    <button onClick={recortarVideo} className="btn btn-success">Recortar video</button>
                 </div>
                 <div className="col-auto">
                     <button className="btn btn-danger">Acción 3</button>

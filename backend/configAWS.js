@@ -1,8 +1,8 @@
 // PAQUETES
 const path = require("path");
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
-const { S3Client } = require("@aws-sdk/client-s3");
-
+const { S3Client }           = require("@aws-sdk/client-s3");
+const { MediaConvertClient } = require('@aws-sdk/client-mediaconvert');
 
 // VARIABLES
 const regionAWS = process.env.REGIONAWS;
@@ -18,6 +18,15 @@ const s3 = new S3Client({
     }
 });
 
+// CLIENTE MEDIA CONVERT
+const mediaConvert = new MediaConvertClient({
+    region: regionAWS,
+    endpoint: process.env.ENDPOINT,
+    credentials: {
+        accessKeyId: process.env.CLAVEACCESO,
+        secretAccessKey: process.env.CLAVEACCESOSECRETA,
+    }
+});
 
 
 
@@ -28,5 +37,7 @@ const s3 = new S3Client({
 // EXPORTAR
 module.exports = {
     s3,
-    bucketAWS
+    bucketAWS,
+    regionAWS,
+    mediaConvert
 };
