@@ -68,6 +68,15 @@ function Home() {
 
         console.log(responseRecortar);
     }
+
+    async function edicionCompleta(event){
+        const response = await axios.post("/edicion-completa", {
+            params: {urlVideo}
+        });
+
+        if(response.status === 200){ alert("video editado correctamente."); }
+        else{  alert(response.data.mensaje); }
+    }
     
 
     return(
@@ -108,7 +117,7 @@ function Home() {
                     <button onClick={recortarVideo} className="btn btn-success">Recortar video</button>
                 </div>
                 <div className="col-auto">
-                    <button className="btn btn-danger">Acción 3</button>
+                    <button onClick={edicionCompleta} className="btn btn-danger">Edición completa</button>
                 </div>
             </div>
         </div>
