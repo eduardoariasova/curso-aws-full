@@ -2,12 +2,15 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 //import axios from 'axios';
-
+// COMPONENTES
+import ZonaCargando from './ZonaCargando';
 
 function Home() {
 
-    const [archivo, setArchivo]   = useState(null);
-    const [urlVideo, setURLVideo] = useState("");
+    const [archivo, setArchivo]           = useState(null);
+    const [urlVideo, setURLVideo]         = useState("");
+    const [cargando, setCargando]         = useState(null);
+    const [videoMostrar, setVideoMostrar] = useState(null);
 
 
     function controlArchivo(event){
@@ -21,6 +24,7 @@ function Home() {
     
 
     async function subidaS3(event){
+        setCargando(true);
         event.preventDefault(); 
 
         if(!archivo){alert("no subiste ningún archivo."); return;}
@@ -37,6 +41,8 @@ function Home() {
             headers: {'Content-Type': 'multipart/form-data',},
             params: {tipoArchivo: tipoArchivo},
         });
+
+        setCargando(false);
         
         if(response.status === 200){
             setURLVideo(response.data.urlGlobal); // guardamos la url para mostrarla
@@ -70,18 +76,25 @@ function Home() {
     }
 
     async function edicionCompleta(event){
+        setCargando(true);
         const response = await axios.post("/edicion-completa", {
             params: {urlVideo}
         });
 
-        if(response.status === 200){ alert("video editado correctamente."); }
+        setCargando(false);
+
+        if(response.status === 200){ 
+            alert("video editado correctamente."); 
+            setVideoMostrar(response.data.urlAmostrar); // guardamos la url del video para mostrarla en componente
+        }
         else{  alert(response.data.mensaje); }
     }
     
 
     return(
     <div>
-        <div className="container text-center my-5">
+    {cargando ? <ZonaCargando /> 
+    :<div className="container text-center my-5">
             <h1>Curso AWS</h1>
             <p>AWS Fullstack: Node.js + React + Servicios en la Nube</p>
             
@@ -120,7 +133,20 @@ function Home() {
                     <button onClick={edicionCompleta} className="btn btn-danger">Edición completa</button>
                 </div>
             </div>
-        </div>
+
+
+            {/* VIDEO A MOSTRAR */}
+            {videoMostrar 
+            ? <div className="mt-5">
+                <video 
+                    src={videoMostrar}
+                    controls
+                    className="w-100"
+                />
+            </div> 
+            : null}
+    </div>
+    }
     </div>
     )
 }

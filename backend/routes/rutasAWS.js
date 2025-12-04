@@ -8,7 +8,7 @@ const {PutObjectCommand } = require("@aws-sdk/client-s3");
 const {CreateJobCommand}  = require('@aws-sdk/client-mediaconvert');
 // FUNCIONES
 const { s3, bucketAWS, regionAWS, mediaConvert } = require('../configAWS.js');
-
+const esperarFinalizacionTrabajo = require('../funcionesAWS/esperarFinalizacionTrabajo.js');
 
 
 
@@ -160,7 +160,7 @@ router.route("/edicion-completa")
         
         // Extraer el ID entre 'archivos/' y '.mp4'
         const idArchivo = urlVideo.match(/archivos\/(.*?)\.mp4/)[1];
-        const urlDestino = "s3://" + bucketAWS + "/finales/" + idArchivo + ".mp4"; // ruta del archivo
+        const urlDestino = "s3://" + bucketAWS + "/finales/" + idArchivo; // ruta del archivo
         
 
         let createJobParams = {};
@@ -288,8 +288,15 @@ router.route("/edicion-completa")
 
 
         let job = await mediaConvert.send(new CreateJobCommand(createJobParams)); // ejecutamos conversión
+        // VERIFICAR SI YA FINALIZÓ EL TRABAJO
+        const idJob = job.Job.Id;
+        console.log("id job: ", idJob);
+        await esperarFinalizacionTrabajo(idJob);
 
-        return res.json({mensaje: "video EDITADO correctamente."});
+        const urlAmostrar = "https://" + bucketAWS + ".s3." + regionAWS + ".amazonaws.com/finales/" + idArchivo + ".mp4";
+        
+
+        return res.json({mensaje: "video EDITADO correctamente.", urlAmostrar });
     }
     catch(err){
         console.log("error al recortar: ", err);
