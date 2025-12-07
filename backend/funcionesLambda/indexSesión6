@@ -1,0 +1,228 @@
+const { rekognition, bucketAWS, regionAWS, mediaConvert } = require('./configAWS');
+const {CreateJobCommand}    = require('@aws-sdk/client-mediaconvert');
+const { StartContentModerationCommand, GetContentModerationCommand } = require('@aws-sdk/client-rekognition');
+const esperarFinalizacionTrabajo = require('./funcionesAWS/esperarFinalizacionTrabajo.js');
+// pequeña función para esperar
+const esperar = (ms) => new Promise((res) => setTimeout(res, ms));
+
+
+exports.handler = async (event) => {
+  // Imprime TODO el evento que llega desde SQS
+  console.log("Evento SQS completo:", JSON.stringify(event, null, 2));
+
+  
+  for (const record of event.Records) {
+    console.log("Mensaje bruto de SQS (record.body):", record.body);
+
+    try {
+      const mensaje = JSON.parse(record.body); // aquí viene el mensaje
+      console.log("Mensaje parseado:", mensaje);
+
+      const {bucket, key, tipoArchivo, idUnico} = mensaje;
+
+
+      // PASO 4 - EJECUTAR MODERACIÓN CON REKOGNITION
+      const comando = new StartContentModerationCommand({
+        Video:{
+          S3Object:{
+            Bucket: bucketAWS,
+            Name: key, // aquí está el video en s3
+          },
+        },
+        MinConfidence: 60, // % seguro
+      });
+
+      const startResp = await rekognition.send(comando);
+      const jobId = startResp.JobId;
+
+      let resultado;
+      while (true) {
+        // espera 5 segundos
+        await esperar(5000);
+
+        const getCmd = new GetContentModerationCommand({
+          JobId: jobId,
+          SortBy: "TIMESTAMP",
+          MaxResults: 1000,
+        });
+
+        const getResp = await rekognition.send(getCmd);
+        console.log(`Estado actual del job ${jobId}: ${getResp.JobStatus}`);
+
+        if (getResp.JobStatus === "IN_PROGRESS") {
+          continue; // sigue esperando
+        }
+
+        resultado = getResp;
+        break;
+      }
+
+      if (!resultado || resultado.JobStatus !== "SUCCEEDED") {
+        console.error(`❌ La moderación falló para idUnico=${idUnico}.`, resultado);
+        continue; // no seguimos a MediaConvert
+      }
+
+
+
+
+
+      // PASO 5: SI SI TUVIMOS ÉXITO EN LA MODERACIÓN, EJECUTAMOS EL JOB
+      console.log("Resultado: ", resultado);
+      // -------------------------------------------------
+      const urlVideo = "s3://" + bucketAWS + "/" + key;
+      const nombreArchivo = key.split("/").pop(); // id.mp4.
+      // Extraer el ID entre 'archivos/' y '.mp4'
+      const idArchivo = nombreArchivo.replace(/\.mp4$/i, ""); // dejamos solo el id.
+      const urlDestino = "s3://" + bucketAWS + "/finales/" + idArchivo; // ruta del archivo
+      
+
+      let createJobParams = {};
+      createJobParams = {
+      Role: process.env.ROLE,
+      Settings: {
+          Inputs: [
+              {
+              FileInput: urlVideo, // desde donde proviene el video
+              TimecodeSource: "ZEROBASED", // Ignora cualquier timecode que venga dentro del archivo original. Empieza a contar el tiempo desde cero.
+              InputClippings: [
+                  {
+                      StartTimecode: "00:00:00:00", // Comienza desde el inicio del video
+                      EndTimecode: "00:00:10:00",   // Termina a los 10 segundos
+                  },
+              ],
+              VideoSelector: {
+                  ColorSpace: 'FOLLOW', // Ajuste para seguir el espacio de color del archivo de entrada
+              },
+              AudioSelectors: {
+                  'Audio Selector 1': {
+                  SelectorType: 'TRACK',
+                  Tracks: [1] // Seleccionar la primera pista de audio
+                  }
+              },
+              // INPUT DE SUBTÍTULOS
+              CaptionSelectors: {
+                  "Captions Selector 1": {
+                      LanguageCode: "SPA", 
+                      SourceSettings: {
+                          SourceType: "WEBVTT",
+                          FileSourceSettings: {
+                              SourceFile: "s3://curso-aws-eduardoarias/necesarios/aaa.vtt", 
+                          },
+                      },
+                  },
+              }
+              }
+          ],
+          OutputGroups: [
+          {
+          Name: 'File Group',
+          Outputs: [
+              {
+              ContainerSettings: {
+                  Container: 'MP4'
+              },
+              VideoDescription: {
+                  Width: 1920,  // Ancho en píxeles 
+                  Height: 1080, // Alto en píxeles
+                  CodecSettings: {
+                  Codec: 'H_264',
+                  H264Settings: {
+                      RateControlMode: 'QVBR',
+                      MaxBitrate: 3000000, // MBPS Igual al valor usado en MediaRecorder, pero redondeado
+                      FramerateControl: 'SPECIFIED', // Especificar la tasa de cuadros por segundo
+                      FramerateNumerator: 30, // Numerador de la tasa de cuadros
+                      FramerateDenominator: 1 // Denominador de la tasa de cuadros, para 60 fps se usa 1
+                  }
+                  }
+              },
+              AudioDescriptions: [
+                  {
+                  AudioSelectorName: 'Audio Selector 1',
+                  CodecSettings: {
+                      Codec: 'AAC',
+                      AacSettings: {
+                      Bitrate: 128000, // 128 Kbps ejempo, igual al valor usado en MediaRecorder, pero redondeado
+                      CodingMode: 'CODING_MODE_2_0',
+                      SampleRate: 48000 // HZ Igual al valor por defecto en MediaRecorder
+                      }
+                  }
+                  }
+              ],
+              // SALIDA DE SUBTÍTULOS
+              CaptionDescriptions: [
+                  {
+                      CaptionSelectorName: "Captions Selector 1",
+                      LanguageCode: "SPA",
+                      LanguageDescription: "Spanish",
+                      DestinationSettings: {
+                      BurninDestinationSettings: {
+                          Alignment: "CENTERED",
+                          FontSize: 16,
+                          OutlineSize: 2,
+                          FontColor: "WHITE",
+                          OutlineColor: "BLACK",
+                          BackgroundColor: "BLACK",
+                          BackgroundOpacity: 0,
+                      },
+                      DestinationType: "BURN_IN",
+                      },
+                  },
+                  ],
+              },
+          ],
+          OutputGroupSettings: {
+              Type: 'FILE_GROUP_SETTINGS',
+              FileGroupSettings: {
+                  Destination: urlDestino
+              }
+          }
+          }
+          ],
+      },
+      };
+
+
+      // AGREGAR LOGO
+      createJobParams.Settings.OutputGroups[0].Outputs[0].VideoDescription.VideoPreprocessors = {
+      ImageInserter: {
+          InsertableImages: [
+          {
+              Width: 150,
+              Height: 150,
+              ImageX: 30,
+              ImageY: 30,
+              Layer: 0,
+              ImageInserterInput: 's3://curso-aws-eduardoarias/necesarios/logo.png',
+              Opacity: 40
+          }
+          ]
+      }
+      };
+
+
+      let job = await mediaConvert.send(new CreateJobCommand(createJobParams)); // ejecutamos conversión
+      // VERIFICAR SI YA FINALIZÓ EL TRABAJO
+      const idJob = job.Job.Id;
+      //console.log("id job: ", idJob);
+      await esperarFinalizacionTrabajo(idJob);
+
+      const urlAmostrar = "https://" + bucketAWS + ".s3." + regionAWS + ".amazonaws.com/finales/" + idArchivo + ".mp4";
+      console.log("trabajo finalizado. ", urlAmostrar);
+      // -------------------------------------------------
+
+
+
+
+
+
+
+    } catch (error) {
+      console.error("Error parseando record.body:", error);
+    }
+  }
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ mensaje: "OK desde Lambda SQS" }),
+  };
+};

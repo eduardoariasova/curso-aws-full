@@ -90,6 +90,39 @@ function Home() {
         else{  alert(response.data.mensaje); }
     }
     
+    async function ejecutarPipeline(event){
+        try{
+            setCargando(true);
+            event.preventDefault(); 
+
+            if(!archivo){alert("no subiste ningún archivo."); return;}
+
+            const formData = new FormData();
+            formData.append('file', archivo);
+
+            // DETERMINAR SI ES VIDEO O SI ES IMAGEN
+            const tipoArchivo = archivo.type;
+
+            // enviamos al servidor
+            const response = await axios.post("/ejecutar-pipeline", formData, {
+                headers: {'Content-Type': 'multipart/form-data',},
+                params: {tipoArchivo: tipoArchivo},
+            });
+
+            if(response.status === 200){
+                alert(response.data.mensaje);
+            }
+        }
+        catch(err){
+            console.log("error al ejecutar pipeline.");
+            alert("error al ejecutar pipeline.");
+        }
+        finally{ setCargando(false); }
+    }
+
+
+
+
 
     return(
     <div>
@@ -120,7 +153,7 @@ function Home() {
 
 
             {/* ACCIONES */}
-            <div className="row justify-content-center mt-5">
+            <div className="row justify-content-center mt-3">
                 {/* botón subida de archivo */}
                 <div className="col-auto">
                     <button onClick={subidaS3} className="btn btn-primary">Subir archivo a s3</button>
@@ -133,6 +166,19 @@ function Home() {
                     <button onClick={edicionCompleta} className="btn btn-danger">Edición completa</button>
                 </div>
             </div>
+
+
+            {/* SESIÓN 6 */}
+            <h3 className="mt-5">PIPELINE SESIÓN 6</h3>
+            <p><strong>1.</strong> Subir video a S3.<br/>
+            <strong>2.</strong> S3 envía un evento a SQS<br/>
+            <strong>3.</strong> SQS desencadena la función Lambda<br/>
+            <strong>4.</strong> Lambda ejecuta Rekognition para moderar el contenido<br/>
+            <strong>5.</strong> Si es apto, Lambda crea el job de MediaConvert
+            </p>
+
+            <button className="btn btn-dark w-100" onClick={ejecutarPipeline} >Ejecutar PIPELINE</button>
+            
 
 
             {/* VIDEO A MOSTRAR */}

@@ -4,10 +4,11 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const router         = require('express').Router();
 const { v4: uuidv4 } = require('uuid');
 const multer         = require('multer');
-const {PutObjectCommand } = require("@aws-sdk/client-s3");
-const {CreateJobCommand}  = require('@aws-sdk/client-mediaconvert');
+const {PutObjectCommand }   = require("@aws-sdk/client-s3");
+const {CreateJobCommand}    = require('@aws-sdk/client-mediaconvert');
+const {SendMessageCommand } = require('@aws-sdk/client-sqs');
 // FUNCIONES
-const { s3, bucketAWS, regionAWS, mediaConvert } = require('../configAWS.js');
+const { s3, bucketAWS, regionAWS, mediaConvert, sqs, colaS6 } = require('../configAWS.js');
 const esperarFinalizacionTrabajo = require('../funcionesAWS/esperarFinalizacionTrabajo.js');
 
 
@@ -304,6 +305,61 @@ router.route("/edicion-completa")
     }
 });
 
+
+router.route("/ejecutar-pipeline")
+.post(async function(req, res){
+    try{
+
+        // ETAPA 1: SUBIDA DE CONTENIDO ---------------------------------------------------------
+        const tipoArchivo = req.query.tipoArchivo; // image/jpeg
+        const idUnico     = uuidv4(); // id Único.
+        const extension   = tipoArchivo.startsWith('image') ? ".jpg" : ".mp4";
+        const rutaEnS3    = "procesando/" + idUnico + extension;
+        console.log("ruta en s3: ", rutaEnS3);
+        // MULTER
+        const storage = multer.memoryStorage(); // se almacena de forma temporal.
+        const upload  = multer({storage: storage});
+
+        upload.single('file')(req, res, async(err) => {
+            if(err) console.log("error desde upload: ", err);
+
+            const params = {
+                Bucket: bucketAWS,
+                Key: rutaEnS3,
+                Body: req.file.buffer,
+                ContentType: tipoArchivo
+            }
+
+            // ejecutamos la subida
+            const comand = new PutObjectCommand(params);
+            await s3.send(comand);
+
+            // ETAPA 2: CREAR MENSAJE SQS ---------------------------------------------------------
+            const mensaje = {
+                bucket: bucketAWS,
+                key: rutaEnS3,
+                tipoArchivo,
+                idUnico
+            }
+
+            const paramsSQS = {
+                QueueUrl: colaS6,
+                MessageBody: JSON.stringify(mensaje),
+                MessageGroupId: "pipeline-videos", // necesario en cola FIFO
+                MessageDeduplicationId: idUnico    // requerido si ContentBasedDeduplication está desactivado
+            };
+            // enviamos a sqs
+            await sqs.send(new SendMessageCommand(paramsSQS));
+
+
+            return res.json({ mensaje: "estamos procesando tu video."});
+        })
+    }
+    catch(err){
+        console.log("error en la solicitud. ", err);
+        return res.json({error: err, mensaje: "error al ejecutar servidor."});
+    }
+});
 
 
 

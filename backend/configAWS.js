@@ -3,6 +3,7 @@ const path = require("path");
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const { S3Client }           = require("@aws-sdk/client-s3");
 const { MediaConvertClient } = require('@aws-sdk/client-mediaconvert');
+const { SQSClient }          = require('@aws-sdk/client-sqs');
 
 // VARIABLES
 const regionAWS = process.env.REGIONAWS;
@@ -28,6 +29,16 @@ const mediaConvert = new MediaConvertClient({
     }
 });
 
+// CLIENTE SQS
+const sqs = new SQSClient({
+    region: regionAWS,
+    credentials: {
+        accessKeyId: process.env.CLAVEACCESO,
+        secretAccessKey: process.env.CLAVEACCESOSECRETA,
+    }
+});
+
+const colaS6 = process.env.COLAS6;
 
 
 
@@ -39,5 +50,7 @@ module.exports = {
     s3,
     bucketAWS,
     regionAWS,
-    mediaConvert
+    mediaConvert,
+    sqs,
+    colaS6
 };
