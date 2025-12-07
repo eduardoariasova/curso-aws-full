@@ -168,13 +168,14 @@ function Home() {
             </div>
 
 
-            {/* SESIÓN 6 */}
-            <h3 className="mt-5">PIPELINE SESIÓN 6</h3>
+            {/* SESIÓN 6 y 7 */}
+            <h3 className="mt-5">PIPELINE SESIÓN 6 y 7</h3>
             <p><strong>1.</strong> Subir video a S3.<br/>
             <strong>2.</strong> S3 envía un evento a SQS<br/>
             <strong>3.</strong> SQS desencadena la función Lambda<br/>
             <strong>4.</strong> Lambda ejecuta Rekognition para moderar el contenido<br/>
-            <strong>5.</strong> Si es apto, Lambda crea el job de MediaConvert
+            <strong>5.</strong> Si es apto, Lambda crea el job de MediaConvert<br/>
+            <strong>6.</strong> Lambda publica una notificación en SNS para avisar que el video está listo<br/>
             </p>
 
             <button className="btn btn-dark w-100" onClick={ejecutarPipeline} >Ejecutar PIPELINE</button>
