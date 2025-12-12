@@ -85,14 +85,12 @@ MEDIACONVERT_ROLE_ARN=arn:aws:iam::123456789012:role/MediaConvertRole
 
 SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/123456789012/mi-cola
 SNS_TOPIC_ARN=arn:aws:sns:us-east-1:123456789012:mi-topico
+```
 
+## 🙋‍♂️ Soporte y comunidad
 
-
-🙋‍♂️ Soporte y comunidad
-
-Si estás inscrito al curso:
-	•	Tienes acceso al servidor privado de Discord, donde puedes hacer preguntas y compartir tu código.
-	•	Dependiendo del plan, también puedes tener acceso a asesoría 1:1.
+- Tienes acceso al servidor privado de Discord, donde puedes hacer preguntas y compartir tu código.
+- Dependiendo del plan, también puedes tener acceso a asesoría 1:1.
 
 La información y enlaces de acceso están dentro de la plataforma del curso.
 
